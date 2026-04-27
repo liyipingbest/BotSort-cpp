@@ -8,10 +8,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-# Add conda lib path to rpath
+# Add conda lib path and onnxruntime path to rpath
 if(DEFINED ENV{CONDA_PREFIX} AND EXISTS "$ENV{CONDA_PREFIX}/lib")
-    set(CMAKE_INSTALL_RPATH "$ENV{CONDA_PREFIX}/lib")
-    set(CMAKE_BUILD_RPATH "$ENV{CONDA_PREFIX}/lib")
+    set(ORT_LIB_DIR "$ENV{CONDA_PREFIX}/lib/python3.13/site-packages/onnxruntime/capi")
+    set(CMAKE_INSTALL_RPATH "$ENV{CONDA_PREFIX}/lib;${ORT_LIB_DIR}")
+    set(CMAKE_BUILD_RPATH "$ENV{CONDA_PREFIX}/lib;${ORT_LIB_DIR}")
 endif()
 
 # Set Build Type if not set
@@ -61,10 +62,19 @@ include_directories(
     ${BOTSORT_INCLUDE_DIRS}
 )
 
+# Find ONNX Runtime
+if(DEFINED ENV{CONDA_PREFIX})
+    set(ONNXRUNTIME_LIB_DIR "$ENV{CONDA_PREFIX}/lib/python3.13/site-packages/onnxruntime/capi")
+else()
+    set(ONNXRUNTIME_LIB_DIR "/usr/lib")
+endif()
+find_library(ONNXRUNTIME_LIB onnxruntime PATHS ${ONNXRUNTIME_LIB_DIR} REQUIRED)
+
 # Source files
 set(SOURCES
     src/main.cpp
     src/YOLODetector.cpp
+    src/ONNXRuntimeEngine.cpp
 )
 
 # Create executable
@@ -74,6 +84,7 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 target_link_libraries(${PROJECT_NAME}
     ${OpenCV_LIBS}
     ${BOTSORT_LIBRARIES}
+    ${ONNXRUNTIME_LIB}
 )
 
 # Add CUDA support if available
