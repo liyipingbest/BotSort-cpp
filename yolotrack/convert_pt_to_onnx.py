@@ -1,10 +1,6 @@
 #!/usr/bin/env python3
 """
-Convert YOLO .pt models to OpenCV DNN compatible ONNX format.
-
-The standard ultralytics ONNX export outputs shape [1, 4+C, N], but the
-YOLODetector postprocess in this project expects [1, N, 4+C]. This script
-inserts a Transpose node to fix the output layout.
+Convert YOLO .pt models to ONNX format for OpenCV DNN.
 
 Usage:
     python3 convert_pt_to_onnx.py models/yolo11n.pt
@@ -12,7 +8,7 @@ Usage:
     python3 convert_pt_to_onnx.py models/yolo11m.pt --output models/yolo11m.onnx
 
 Requirements:
-    pip install ultralytics onnx onnxsim
+    pip install ultralytics onnx
 """
 
 import argparse
@@ -21,121 +17,44 @@ from pathlib import Path
 
 
 def check_deps():
-    """Raise a clear error if required packages are missing."""
     missing = []
-    for mod, pkg in [("ultralytics", "ultralytics"),
-                     ("onnx", "onnx"),
-                     ("onnxsim", "onnxsim")]:
+    for mod in ("ultralytics",):
         try:
             __import__(mod)
         except ImportError:
-            missing.append(pkg)
+            missing.append(mod)
     if missing:
         sys.exit(
-            "Missing packages: {}\n"
-            "Install with: pip install {}".format(
-                " ".join(missing), " ".join(missing)
-            )
+            f"Missing packages: {' '.join(missing)}\n"
+            f"Install with: pip install {' '.join(missing)}"
         )
-
-
-def add_transpose_node(onnx_model, perm=(0, 2, 1)):
-    """
-    Insert a Transpose node after the last graph output to convert layout
-    from [batch, 4+C, N] to [batch, N, 4+C].
-    """
-    import onnx
-    from onnx import helper, TensorProto
-
-    graph = onnx_model.graph
-    output = graph.output[0]
-
-    perm_init = helper.make_node(
-        "Constant",
-        inputs=[],
-        outputs=[f"{output.name}_perm"],
-        value=helper.make_tensor(
-            name=f"{output.name}_perm_value",
-            data_type=TensorProto.INT64,
-            dims=(3,),
-            vals=list(perm),
-        ),
-    )
-    transpose_node = helper.make_node(
-        "Transpose",
-        inputs=[output.name, f"{output.name}_perm"],
-        outputs=[f"{output.name}_transposed"],
-    )
-
-    shape = output.type.tensor_type.shape
-    new_output = helper.make_tensor_value_info(
-        f"{output.name}_transposed",
-        output.type.tensor_type.elem_type,
-        [shape.dim[p] for p in perm],
-    )
-
-    graph.node.extend([perm_init, transpose_node])
-    graph.output.pop()
-    graph.output.append(new_output)
-
-    onnx.checker.check_model(onnx_model)
-    return onnx_model
 
 
 def export_pt_to_onnx(pt_path, output_path=None, imgsz=640, opset=12):
-    """Export a .pt YOLO model to ONNX with output shape [1, N, 4+C]."""
-    import onnx
+    """Export a .pt YOLO model to ONNX."""
     from ultralytics import YOLO
 
     model = YOLO(str(pt_path))
+    model.export(
+        format="onnx", imgsz=imgsz, opset=opset,
+        simplify=True, device="cpu",
+    )
 
-    # Standard ultralytics export produces [1, 4+C, N]
-    use_simplify = True
-    try:
-        tmp_path = model.export(
-            format="onnx", imgsz=imgsz, opset=opset,
-            simplify=True, device="cpu",
-        )
-    except Exception:
-        # onnxsim may not be available; retry without simplify
-        print("  (onnxsim unavailable, exporting without simplify)")
-        use_simplify = False
-        tmp_path = model.export(
-            format="onnx", imgsz=imgsz, opset=opset,
-            simplify=False, device="cpu",
-        )
+    # ultralytics saves next to the source .pt with .onnx extension
+    default_path = pt_path.with_suffix(".onnx")
 
-    tmp_path = Path(tmp_path)
-    print(f"  Standard ONNX exported: {tmp_path}")
-
-    # Insert Transpose node
-    onnx_model = onnx.load(str(tmp_path))
-    onnx_model = add_transpose_node(onnx_model)
-
-    # Optional: simplify again after adding Transpose
-    if use_simplify:
-        try:
-            import onnxsim
-            onnx_model, _ = onnxsim.simplify(onnx_model)
-        except Exception:
-            pass
-
-    out_path = output_path or pt_path.with_suffix(".onnx")
-    onnx.save(onnx_model, str(out_path))
-
-    # Remove intermediate file
-    if tmp_path != out_path and tmp_path.exists():
-        tmp_path.unlink()
-
-    print(f"  Final ONNX saved: {out_path}")
-    return out_path
+    if output_path and Path(output_path) != default_path:
+        Path(default_path).rename(output_path)
+        print(f"Saved: {output_path}")
+    else:
+        print(f"Saved: {default_path}")
 
 
 def main():
     check_deps()
 
     parser = argparse.ArgumentParser(
-        description="Convert YOLO .pt models to OpenCV DNN compatible ONNX"
+        description="Convert YOLO .pt models to ONNX"
     )
     parser.add_argument(
         "model", nargs="?", default=None,
@@ -155,7 +74,7 @@ def main():
     )
     parser.add_argument(
         "--opset", type=int, default=12,
-        help="ONNX opset version for OpenCV DNN (default: 12)",
+        help="ONNX opset version (default: 12)",
     )
     args = parser.parse_args()
 
