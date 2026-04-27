@@ -1,7 +1,7 @@
 #pragma once
 
-#include <eigen3/Eigen/Core>
-#include <eigen3/Eigen/Dense>
+#include <Eigen/Core>
+#include <Eigen/Dense>
 #include <fstream>
 #include <memory>
 #include <numeric>

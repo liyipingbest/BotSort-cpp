@@ -19,7 +19,7 @@ list(FILTER SOURCES EXCLUDE REGEX ".*TRT_InferenceEngine.*")
 list(FILTER SOURCES EXCLUDE REGEX ".*ReID\.cpp$")
 
 # Create library
-add_library(${PROJECT_NAME} SHARED ${SOURCES})
+add_library(${PROJECT_NAME} STATIC ${SOURCES})
 
 # Set include directories
 target_include_directories(${PROJECT_NAME} PUBLIC
