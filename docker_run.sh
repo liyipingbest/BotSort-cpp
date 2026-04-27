@@ -13,7 +13,7 @@ if [ ! -f "$HASH_FILE" ]; then
 		--volume="/tmp/.X11-unix:/tmp/.X11-unix:rw" \
 		--env="XAUTHORITY=$XAUTH" \
 		--volume="$XAUTH:$XAUTH" \
-		--mount type=bind,source=$MOUNT_FOLDER,target=/home/user/work/ \
+		--mount type=bind,source=$MOUNT_FOLDER,target=/data/dev/projects/AI/BoTSORT-cpp/target/ \
 		botsort-trt:latest >$HASH_FILE
 	echo "Starting container"
 	docker start $(cat $HASH_FILE)
