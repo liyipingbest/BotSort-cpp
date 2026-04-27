@@ -24,3 +24,8 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${botsort_INCLUDE_DIRS})
 # Link libraries
 target_link_libraries(${PROJECT_NAME} ${OpenCV_LIBS})
 target_link_libraries(${PROJECT_NAME} botsort)
+
+# Add NO_CUDA macro if CUDA is not found
+if(NOT CUDA_FOUND)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NO_CUDA)
+endif()

@@ -10,6 +10,10 @@
 #include "matching.h"
 #include "profiler.h"
 
+#ifndef NO_CUDA
+#include "ReIDParams.h"
+#endif
+
 namespace
 {
 template<typename T>
@@ -47,6 +51,7 @@ T fetch_config(const Config<T> &config,
 }
 }// namespace
 
+#ifndef NO_CUDA
 BoTSORT::BoTSORT(const Config<TrackerParams> &tracker_config,
                  const Config<GMC_Params> &gmc_config,
                  const Config<ReIDParams> &reid_config,
@@ -68,9 +73,9 @@ BoTSORT::BoTSORT(const Config<TrackerParams> &tracker_config,
     if (_reid_enabled && not_empty(reid_config) &&
         reid_onnx_model_path.size() > 0)
     {
-        auto reid_params =
+        auto reid_params = 
                 fetch_config<ReIDParams>(reid_config, ReIDParams::load_config);
-        _reid_model =
+        _reid_model = 
                 std::make_unique<ReIDModel>(reid_params, reid_onnx_model_path);
     }
     else
@@ -96,6 +101,43 @@ BoTSORT::BoTSORT(const Config<TrackerParams> &tracker_config,
         _gmc_enabled = false;
     }
 }
+#else
+BoTSORT::BoTSORT(const Config<TrackerParams> &tracker_config,
+                 const Config<GMC_Params> &gmc_config)
+{
+    auto tracker_params = fetch_config<TrackerParams>(
+            tracker_config, TrackerParams::load_config);
+    _load_params_from_config(tracker_params);
+
+    // Tracker module
+    _frame_id = 0;
+    _buffer_size = static_cast<uint8_t>(_frame_rate / 30.0 * _track_buffer);
+    _max_time_lost = _buffer_size;
+    _kalman_filter = std::make_unique<KalmanFilter>(
+            static_cast<double>(1.0 / _frame_rate));
+
+    // Re-ID module is disabled due to missing CUDA
+    std::cout << "Re-ID module disabled (CUDA not available)" << std::endl;
+    _reid_enabled = false;
+
+    // Global motion compensation module
+    if (_gmc_enabled && not_empty(gmc_config))
+    {
+        auto gmc_params = fetch_config<
+                GMC_Params>(gmc_config, [this](const std::string &config_path) {
+            return GMC_Params::load_config(
+                    GlobalMotionCompensation::GMC_method_map[_gmc_method_name],
+                    config_path);
+        });
+        _gmc_algo = std::make_unique<GlobalMotionCompensation>(gmc_params);
+    }
+    else
+    {
+        std::cout << "GMC disabled" << std::endl;
+        _gmc_enabled = false;
+    }
+}
+#endif
 
 
 std::vector<std::shared_ptr<Track>>
@@ -134,11 +176,16 @@ BoTSORT::track(const std::vector<Detection> &detections, const cv::Mat &frame)
             {
                 if (_reid_enabled)
                 {
+#ifndef NO_CUDA
                     FeatureVector embedding =
                             _extract_features(frame, detection.bbox_tlwh);
                     tracklet = std::make_shared<Track>(
                             tlwh, detection.confidence, detection.class_id,
                             embedding);
+#else
+                    tracklet = std::make_shared<Track>(
+                            tlwh, detection.confidence, detection.class_id);
+#endif
                 }
                 else
                     tracklet = std::make_shared<Track>(
@@ -200,13 +247,15 @@ BoTSORT::track(const std::vector<Detection> &detections, const cv::Mat &frame)
     if (_reid_enabled)
     {
         // If re-ID is enabled, find the embedding distance between all tracked tracks and high confidence detections
-        std::tie(raw_emd_dist, emd_dist_mask_1st_association) =
+#ifndef NO_CUDA
+        std::tie(raw_emd_dist, emd_dist_mask_1st_association) = 
                 embedding_distance(tracks_pool, detections_high_conf,
                                    _appearance_thresh,
                                    _reid_model->get_distance_metric());
         fuse_motion(*_kalman_filter, raw_emd_dist, tracks_pool,
-                    detections_high_conf,
+                    detections_high_conf, 
                     _lambda);// Fuse the motion with embedding distance
+#endif
     }
 
     // Fuse the IoU distance and embedding distance to get the final distance matrix
@@ -324,7 +373,8 @@ BoTSORT::track(const std::vector<Detection> &detections, const cv::Mat &frame)
     if (_reid_enabled)
     {
         // Find embedding distance between unconfirmed tracks and high confidence detections left after the first association
-        std::tie(raw_emd_dist_unconfirmed, emd_dist_mask_unconfirmed) =
+#ifndef NO_CUDA
+        std::tie(raw_emd_dist_unconfirmed, emd_dist_mask_unconfirmed) = 
                 embedding_distance(unconfirmed_tracks,
                                    unmatched_detections_after_1st_association,
                                    _appearance_thresh,
@@ -332,6 +382,7 @@ BoTSORT::track(const std::vector<Detection> &detections, const cv::Mat &frame)
         fuse_motion(*_kalman_filter, raw_emd_dist_unconfirmed,
                     unconfirmed_tracks,
                     unmatched_detections_after_1st_association, _lambda);
+#endif
     }
 
     // Fuse the IoU distance and the embedding distance
@@ -443,12 +494,14 @@ BoTSORT::track(const std::vector<Detection> &detections, const cv::Mat &frame)
 }
 
 
+#ifndef NO_CUDA
 FeatureVector BoTSORT::_extract_features(const cv::Mat &frame,
                                          const cv::Rect_<float> &bbox_tlwh)
 {
     cv::Mat patch = frame(bbox_tlwh);
     return _reid_model->extract_features(patch);
 }
+#endif
 
 
 std::vector<std::shared_ptr<Track>>

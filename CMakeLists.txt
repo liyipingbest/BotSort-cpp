@@ -26,9 +26,13 @@ set(CMAKE_INSTALL_BINDIR bin)
 set(CMAKE_INSTALL_LIBDIR lib)
 set(CMAKE_INSTALL_INCLUDEDIR include)
 
-# Check OpenCV and Eigen3
+# Check OpenCV, Eigen3 and Boost
 find_package(OpenCV REQUIRED)
 find_package(Eigen3 REQUIRED)
+find_package(Boost REQUIRED COMPONENTS filesystem)
+
+# Find CUDA
+find_package(CUDA QUIET)
 
 # add botsort
 add_subdirectory(botsort)

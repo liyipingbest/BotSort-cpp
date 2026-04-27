@@ -5,10 +5,13 @@
 
 #include "GlobalMotionCompensation.h"
 #include "GmcParams.h"
-#include "ReID.h"
-#include "ReIDParams.h"
 #include "TrackerParams.h"
 #include "track.h"
+
+#ifndef NO_CUDA
+#include "ReID.h"
+#include "ReIDParams.h"
+#endif
 
 template<typename T>
 using Config = std::variant<T, std::string, std::monostate>;
@@ -17,9 +20,12 @@ class BoTSORT
 {
 public:
     explicit BoTSORT(const Config<TrackerParams> &tracker_config,
-                     const Config<GMC_Params> &gmc_config = {},
-                     const Config<ReIDParams> &reid_config = {},
-                     const std::string &reid_onnx_model_path = "");
+                     const Config<GMC_Params> &gmc_config = {}
+#ifndef NO_CUDA
+                     , const Config<ReIDParams> &reid_config = {},
+                     const std::string &reid_onnx_model_path = ""
+#endif
+    );
 
     ~BoTSORT() = default;
 
@@ -36,6 +42,7 @@ public:
 
 
 private:
+#ifndef NO_CUDA
     /**
      * @brief Extract visual features from the given frame and bounding box
      * 
@@ -45,6 +52,7 @@ private:
      */
     FeatureVector _extract_features(const cv::Mat &frame,
                                     const cv::Rect_<float> &bbox_tlwh);
+#endif
 
     /**
      * @brief Merge the given track lists
@@ -106,5 +114,7 @@ private:
 
     std::unique_ptr<KalmanFilter> _kalman_filter;
     std::unique_ptr<GlobalMotionCompensation> _gmc_algo;
+#ifndef NO_CUDA
     std::unique_ptr<ReIDModel> _reid_model;
+#endif
 };

@@ -13,8 +13,10 @@ if(NOT CMAKE_BUILD_TYPE)
         "MinSizeRel" "RelWithDebInfo")
 endif()
 
-# Collect all source files
+# Collect all source files except TensorRT and ReID related files
 file(GLOB_RECURSE SOURCES "${PROJECT_SOURCE_DIR}/src/*.cpp")
+list(FILTER SOURCES EXCLUDE REGEX ".*TRT_InferenceEngine.*")
+list(FILTER SOURCES EXCLUDE REGEX ".*ReID\.cpp$")
 
 # Create library
 add_library(${PROJECT_NAME} SHARED ${SOURCES})
@@ -45,6 +47,7 @@ find_package(CUDA QUIET)
 
 if(NOT ${CUDA_FOUND})
     message(WARNING "CUDA not found, ReID won't be built")
+    target_compile_definitions(${PROJECT_NAME} PRIVATE NO_CUDA)
 else()
     message(STATUS "CUDA version ${CUDA_VERSION_STRING} found")
     target_include_directories(${PROJECT_NAME} PUBLIC ${CUDA_INCLUDE_DIRS})

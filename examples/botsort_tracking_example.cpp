@@ -311,9 +311,15 @@ int main(int argc, char **argv)
     }
     else
     {
+#ifndef NO_CUDA
         tracker = std::make_unique<BoTSORT>(tracker_config_path,
                                             gmc_config_path, reid_config_path,
                                             reid_onnx_model_path);
+#else
+        tracker = std::make_unique<BoTSORT>(tracker_config_path,
+                                            gmc_config_path);
+        std::cout << "Re-ID module disabled in example due to missing CUDA" << std::endl;
+#endif
     }
 
     if (is_video)
