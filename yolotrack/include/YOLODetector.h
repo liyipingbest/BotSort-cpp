@@ -30,6 +30,9 @@ private:
     std::unique_ptr<ONNXRuntimeEngine> engine_;
     float conf_threshold_;
     float nms_threshold_;
+    float letterbox_scale_ = 1.0f;
+    int letterbox_x_offset_ = 0;
+    int letterbox_y_offset_ = 0;
 
     void preprocess(const cv::Mat& frame, cv::Mat& blob);
     std::vector<yolo::Detection> postprocess(const std::vector<cv::Mat>& outputs,

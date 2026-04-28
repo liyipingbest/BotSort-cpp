@@ -89,7 +89,7 @@ int main(int argc, char** argv) {
     std::cout << "Loading YOLO model from: " << yolo_model_path << std::endl;
     
     try {
-        YOLODetector detector(yolo_model_path, 0.5f, 0.4f);
+        YOLODetector detector(yolo_model_path, 0.25f, 0.4f);
         
         std::cout << "Initializing BoTSORT tracker..." << std::endl;
         std::string tracker_config = "../config/tracker.ini";

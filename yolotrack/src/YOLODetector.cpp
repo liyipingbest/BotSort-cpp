@@ -15,21 +15,21 @@ cv::Mat YOLODetector::resize_with_padding(const cv::Mat& frame, cv::Size& target
     int original_width = frame.cols;
     int original_height = frame.rows;
 
-    float scale = std::min(static_cast<float>(target_size.width) / original_width,
+    letterbox_scale_ = std::min(static_cast<float>(target_size.width) / original_width,
                          static_cast<float>(target_size.height) / original_height);
 
-    int new_width = static_cast<int>(original_width * scale);
-    int new_height = static_cast<int>(original_height * scale);
+    int new_width = static_cast<int>(original_width * letterbox_scale_);
+    int new_height = static_cast<int>(original_height * letterbox_scale_);
 
     cv::Mat resized;
     cv::resize(frame, resized, cv::Size(new_width, new_height));
 
     cv::Mat padded(target_size, CV_8UC3, cv::Scalar(114, 114, 114));
 
-    int x_offset = (target_size.width - new_width) / 2;
-    int y_offset = (target_size.height - new_height) / 2;
+    letterbox_x_offset_ = (target_size.width - new_width) / 2;
+    letterbox_y_offset_ = (target_size.height - new_height) / 2;
 
-    cv::Rect roi(x_offset, y_offset, new_width, new_height);
+    cv::Rect roi(letterbox_x_offset_, letterbox_y_offset_, new_width, new_height);
     resized.copyTo(padded(roi));
 
     return padded;
@@ -48,13 +48,11 @@ std::vector<yolo::Detection> YOLODetector::postprocess(const std::vector<cv::Mat
     std::vector<float> confidences;
     std::vector<cv::Rect> boxes;
 
-    float x_scale = static_cast<float>(frame_size.width) / 640.0f;
-    float y_scale = static_cast<float>(frame_size.height) / 640.0f;
+    float x_scale = 1.0f / letterbox_scale_;
+    float y_scale = 1.0f / letterbox_scale_;
 
     for (const auto& output : outputs) {
         const float* data = (float*)output.data;
-
-        // YOLO11 ONNX output is [1, 4+C, N] — channels-first layout
         int num_classes = output.size[1] - 4;
         int num_detections = output.size[2];
 
@@ -77,8 +75,8 @@ std::vector<yolo::Detection> YOLODetector::postprocess(const std::vector<cv::Mat
 
             if (max_conf > conf_threshold_) {
 
-                int x = static_cast<int>((cx - w/2.0f) * x_scale);
-                int y = static_cast<int>((cy - h/2.0f) * y_scale);
+                int x = static_cast<int>((cx - w/2.0f - letterbox_x_offset_) * x_scale);
+                int y = static_cast<int>((cy - h/2.0f - letterbox_y_offset_) * y_scale);
                 int width = static_cast<int>(w * x_scale);
                 int height = static_cast<int>(h * y_scale);
 
