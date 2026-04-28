@@ -1,4 +1,5 @@
 #include <iostream>
+#include <iomanip>
 #include <chrono>
 #include <filesystem>
 #include <opencv2/opencv.hpp>
@@ -154,13 +155,23 @@ int main(int argc, char** argv) {
             if (writer.isOpened()) {
                 writer.write(frame);
             }
-            
+
             frame_count++;
-            
+
+            double detect_ms = detect_time.count() * 1000.0;
+            double track_ms = track_time.count() * 1000.0;
+            double total_ms = detect_ms + track_ms;
+            std::cout << "Frame " << frame_count << " | "
+                      << "det: " << std::fixed << std::setprecision(1) << detect_ms << "ms | "
+                      << "trk: " << track_ms << "ms | "
+                      << "total: " << total_ms << "ms | "
+                      << "boxes: " << tracks.size()
+                      << std::endl;
+
             if (frame_count % 30 == 0) {
-                std::cout << "Processed " << frame_count << "/" << total_frames 
-                          << " frames | Detect: " << (30.0 / (detect_time.count() * 30)) 
-                          << " FPS | Track: " << (30.0 / (track_time.count() * 30)) << " FPS" 
+                std::cout << "Processed " << frame_count << "/" << total_frames
+                          << " frames | Detect: " << (30.0 / (detect_time.count() * 30))
+                          << " FPS | Track: " << (30.0 / (track_time.count() * 30)) << " FPS"
                           << std::endl;
             }
             
